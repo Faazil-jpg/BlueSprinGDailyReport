@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlueSpring — Daily Report System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background:#f0f4f8; font-family:'Segoe UI',sans-serif; }
+        .page { display:none; }
+        #login-page { min-height:100vh; background:linear-gradient(135deg,#1a6fc4,#0d47a1); display:flex; align-items:center; justify-content:center; padding:1rem; }
+        #setup-page { min-height:100vh; background:linear-gradient(135deg,#1a6fc4,#0d47a1); display:flex; align-items:center; justify-content:center; padding:1rem; }
+        .login-card { background:white; border-radius:16px; padding:2.5rem; width:100%; max-width:440px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+        .setup-card { background:white; border-radius:16px; padding:2.5rem; width:100%; max-width:680px; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+        .app-navbar { background:linear-gradient(90deg,#1a6fc4,#0d47a1); padding:.8rem 1.5rem; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 10px rgba(0,0,0,.2); position:sticky; top:0; z-index:100; }
+        .app-navbar .brand { color:white; font-weight:700; font-size:1.2rem; }
+        .app-navbar .user-info { color:rgba(255,255,255,.9); display:flex; align-items:center; gap:.8rem; }
+        .layout { display:flex; min-height:calc(100vh - 56px); }
+        .sidebar { width:240px; background:white; border-right:1px solid #e0e0e0; padding:1.5rem 0; flex-shrink:0; }
+        .sidebar-item { display:flex; align-items:center; gap:.75rem; padding:.75rem 1.5rem; color:#555; cursor:pointer; transition:all .2s; border-left:3px solid transparent; text-decoration:none; }
+        .sidebar-item:hover { background:#f0f4f8; color:#1a6fc4; }
+        .sidebar-item.active { background:#e8f0fe; color:#1a6fc4; border-left-color:#1a6fc4; font-weight:600; }
+        .sidebar-item i { width:20px; text-align:center; }
+        .sidebar-section { padding:.75rem 1.5rem .25rem; font-size:.72rem; color:#aaa; font-weight:600; text-transform:uppercase; letter-spacing:1px; }
+        .main-content { flex:1; padding:2rem; overflow-y:auto; }
+        .stat-card { background:white; border-radius:12px; padding:1.5rem; box-shadow:0 2px 8px rgba(0,0,0,.08); border-left:4px solid; }
+        .stat-card.blue  { border-left-color:#1a6fc4; }
+        .stat-card.green { border-left-color:#28a745; }
+        .stat-card.orange{ border-left-color:#fd7e14; }
+        .stat-card.purple{ border-left-color:#6f42c1; }
+        .stat-value { font-size:2rem; font-weight:700; color:#333; }
+        .stat-label { color:#888; font-size:.85rem; }
+        .badge-completed   { background:#d4edda; color:#155724; border-radius:20px; padding:3px 10px; font-size:.8rem; display:inline-block; }
+        .badge-in-progress { background:#fff3cd; color:#856404; border-radius:20px; padding:3px 10px; font-size:.8rem; display:inline-block; }
+        .badge-not-started { background:#cce5ff; color:#004085; border-radius:20px; padding:3px 10px; font-size:.8rem; display:inline-block; }
+        .calendar-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+        .cal-header-cell { text-align:center; font-weight:600; color:#666; padding:8px; font-size:.85rem; }
+        .cal-cell { background:white; border-radius:8px; min-height:80px; padding:6px; border:1px solid #e8e8e8; }
+        .cal-cell.clickable { cursor:pointer; }
+        .cal-cell.clickable:hover { background:#f0f4f8; border-color:#1a6fc4; }
+        .cal-cell.today { border-color:#1a6fc4; background:#e8f0fe; }
+        .cal-cell.other-month { opacity:.4; }
+        .cal-day-num { font-weight:600; font-size:.9rem; color:#333; margin-bottom:4px; }
+        .today .cal-day-num { background:#1a6fc4; color:white; width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+        .cal-task-lbl { font-size:.7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:3px; padding:1px 4px; margin-bottom:2px; display:block; }
+        .cal-task-lbl.completed   { background:#d4edda; color:#155724; }
+        .cal-task-lbl.in-progress { background:#fff3cd; color:#856404; }
+        .cal-task-lbl.not-started { background:#cce5ff; color:#004085; }
+        .task-item { background:#f8f9fa; border-radius:10px; padding:1rem; margin-bottom:.75rem; border:1px solid #e0e0e0; position:relative; }
+        .task-item .rm-btn { position:absolute; top:.5rem; right:.5rem; background:none; border:none; color:#dc3545; cursor:pointer; }
+        .report-card { background:white; border-radius:12px; padding:1.5rem; margin-bottom:1rem; box-shadow:0 2px 8px rgba(0,0,0,.08); border-left:4px solid #1a6fc4; }
+        .rpt-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; }
+        .data-table { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+        .data-table table { margin:0; }
+        .data-table thead { background:#f0f4f8; }
+        .empty-state { text-align:center; padding:3rem; color:#aaa; }
+        .empty-state i { font-size:3rem; margin-bottom:1rem; display:block; }
+        .section-title { font-size:1.4rem; font-weight:700; color:#333; margin-bottom:1.5rem; display:flex; align-items:center; gap:.5rem; }
+        .miss-alert { background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:.75rem 1rem; color:#856404; font-size:.9rem; }
+        .task-detail-item { background:#f8f9fa; border-radius:8px; padding:.75rem; margin-bottom:.5rem; }
+        .toast-container { position:fixed; top:70px; right:20px; z-index:9999; }
+        .form-label { font-weight:500; color:#444; }
+        .progress-bar-wrap { height:8px; border-radius:4px; margin-top:.5rem; }
+        .loading-view { text-align:center; padding:4rem 2rem; color:#888; }
+        .loading-view .spinner-border { width:2.5rem; height:2.5rem; color:#1a6fc4; }
+        .step-num { width:32px; height:32px; border-radius:50%; background:#1a6fc4; color:white; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.9rem; }
+        .step-row { display:flex; align-items:flex-start; gap:1rem; margin-bottom:1.2rem; }
+        code { background:#f0f4f8; padding:2px 6px; border-radius:4px; font-size:.85rem; color:#c7254e; }
+        @media(max-width:768px){ .sidebar{display:none;} .main-content{padding:1rem;} }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     SETUP PAGE  (shown until Firebase is configured)
+════════════════════════════════════════════ -->
+<div id="setup-page">
+    <div class="setup-card">
+        <div class="text-center mb-4">
+            <i class="fas fa-droplet fa-3x" style="color:#1a6fc4;"></i>
+            <h1 style="color:#1a6fc4;font-weight:700;font-size:1.6rem;" class="mt-2 mb-0">BlueSpring Reports</h1>
+            <p class="text-muted mb-0">One-time Firebase setup required</p>
+        </div>
+
+        <div id="setup-error" class="alert alert-danger d-none mb-3"></div>
+
+        <p class="text-muted" style="font-size:.9rem;">This app stores data in <strong>Firebase</strong> (free) so all your staff share the same database. Follow these steps once, then you're done forever.</p>
+
+        <div class="step-row">
+            <div class="step-num">1</div>
+            <div>
+                <strong>Create a free Firebase project</strong><br>
+                <span class="text-muted" style="font-size:.85rem;">Go to <strong>console.firebase.google.com</strong> → click <em>Add project</em> → give it any name (e.g. <em>bluespring-reports</em>) → click through the wizard.</span>
+            </div>
+        </div>
+        <div class="step-row">
+            <div class="step-num">2</div>
+            <div>
+                <strong>Register a Web App &amp; copy the config</strong><br>
+                <span class="text-muted" style="font-size:.85rem;">In your project → click the <strong>&lt;/&gt;</strong> (Web) icon → give it a nickname → click <em>Register app</em> → copy the <code>firebaseConfig</code> object shown.</span>
+            </div>
+        </div>
+        <div class="step-row">
+            <div class="step-num">3</div>
+            <div>
+                <strong>Enable Firestore Database</strong><br>
+                <span class="text-muted" style="font-size:.85rem;">In Firebase Console → <em>Build</em> → <em>Firestore Database</em> → <em>Create database</em> → choose <em>Start in test mode</em> → pick any location → Done.</span>
+            </div>
+        </div>
+        <div class="step-row">
+            <div class="step-num">4</div>
+            <div>
+                <strong>Paste your config below</strong><br>
+                <span class="text-muted" style="font-size:.85rem;">Fill in each field from the <code>firebaseConfig</code> object you copied above.</span>
+            </div>
+        </div>
+
+        <div class="p-3 rounded mb-3" style="background:#f8f9fa; border:1px solid #e0e0e0;">
+            <div class="row g-2">
+                <div class="col-12"><label class="form-label" style="font-size:.8rem;">API KEY</label><input class="form-control form-control-sm" id="cfg-apiKey" placeholder="AIzaSy..."></div>
+                <div class="col-12"><label class="form-label" style="font-size:.8rem;">AUTH DOMAIN</label><input class="form-control form-control-sm" id="cfg-authDomain" placeholder="your-project.firebaseapp.com"></div>
+                <div class="col-12"><label class="form-label" style="font-size:.8rem;">PROJECT ID</label><input class="form-control form-control-sm" id="cfg-projectId" placeholder="your-project-id"></div>
+                <div class="col-sm-6"><label class="form-label" style="font-size:.8rem;">STORAGE BUCKET</label><input class="form-control form-control-sm" id="cfg-storageBucket" placeholder="your-project.appspot.com"></div>
+                <div class="col-sm-6"><label class="form-label" style="font-size:.8rem;">MESSAGING SENDER ID</label><input class="form-control form-control-sm" id="cfg-messagingSenderId" placeholder="123456789"></div>
+                <div class="col-12"><label class="form-label" style="font-size:.8rem;">APP ID</label><input class="form-control form-control-sm" id="cfg-appId" placeholder="1:123456:web:abc123"></div>
+            </div>
+        </div>
+
+        <button class="btn btn-primary w-100 py-2" id="cfg-save-btn" style="background:#1a6fc4;border-color:#1a6fc4;">
+            <i class="fas fa-rocket me-2"></i>Save Config &amp; Launch App
+        </button>
+        <p class="text-muted text-center mt-3" style="font-size:.78rem;">
+            Config is saved in your browser. You only do this once per device.<br>
+            First launch will create the default admin account: <strong>admin / admin123</strong>
+        </p>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     LOGIN PAGE
+════════════════════════════════════════════ -->
+<div id="login-page">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <i class="fas fa-droplet fa-3x" style="color:#1a6fc4;"></i>
+            <h1 style="color:#1a6fc4;font-weight:700;font-size:1.8rem;" class="mt-2 mb-0">BlueSpring</h1>
+            <p class="text-muted">Daily Report Management System</p>
+        </div>
+        <form id="login-form">
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                    <input type="text" class="form-control" id="login-user" placeholder="Enter username" required autocomplete="username">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                    <input type="password" class="form-control" id="login-pass" placeholder="Enter password" required autocomplete="current-password">
+                    <button type="button" class="btn btn-outline-secondary" id="toggle-pwd"><i class="fas fa-eye"></i></button>
+                </div>
+            </div>
+            <div id="login-err" class="alert alert-danger d-none py-2 mb-3"></div>
+            <button type="submit" class="btn btn-primary w-100 py-2" style="background:#1a6fc4;border-color:#1a6fc4;" id="login-btn">
+                <i class="fas fa-sign-in-alt me-2"></i>Sign In
+            </button>
+        </form>
+        <hr>
+        <div class="text-center" style="font-size:.8rem;">
+            <a href="#" id="reconfigure-link" class="text-muted" style="font-size:.75rem;"><i class="fas fa-cog me-1"></i>Reconfigure Firebase</a>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════ -->
+<div id="app-page" class="page">
+    <nav class="app-navbar">
+        <div class="brand"><i class="fas fa-droplet me-2"></i>BlueSpring Reports</div>
+        <div class="user-info">
+            <span id="nav-role" class="badge bg-light text-primary"></span>
+            <span id="nav-name" class="d-none d-sm-inline"></span>
+            <button class="btn btn-sm btn-outline-light" id="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+    </nav>
+    <div class="layout">
+        <div class="sidebar" id="sidebar"></div>
+        <div class="main-content" id="main"></div>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal fade" id="dayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a6fc4;color:white;">
+                <h5 class="modal-title" id="dayModalTitle"></h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dayModalBody"></div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="rptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a6fc4;color:white;">
+                <h5 class="modal-title" id="rptModalTitle"></h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="rptModalBody"></div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="addStaffModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a6fc4;color:white;">
+                <h5 class="modal-title">Add Staff Member</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Full Name *</label><input type="text" class="form-control" id="sf-name"></div>
+                <div class="mb-3"><label class="form-label">Username *</label><input type="text" class="form-control" id="sf-user"></div>
+                <div class="mb-3"><label class="form-label">Password *</label><input type="password" class="form-control" id="sf-pass"></div>
+                <div class="mb-3"><label class="form-label">Department</label><input type="text" class="form-control" id="sf-dept"></div>
+                <div id="sf-err" class="alert alert-danger d-none py-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" id="sf-save-btn" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-plus me-1"></i>Add Staff</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="pwdModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#1a6fc4;color:white;">
+                <h5 class="modal-title">Change Password</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label">Current Password</label><input type="password" class="form-control" id="cp-cur"></div>
+                <div class="mb-3"><label class="form-label">New Password</label><input type="password" class="form-control" id="cp-new"></div>
+                <div class="mb-3"><label class="form-label">Confirm New Password</label><input type="password" class="form-control" id="cp-conf"></div>
+                <div id="cp-err" class="alert alert-danger d-none py-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" id="cp-save-btn" style="background:#1a6fc4;border-color:#1a6fc4;">Update Password</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container">
+    <div id="app-toast" class="toast align-items-center border-0 text-white" role="alert">
+        <div class="d-flex">
+            <div class="toast-body" id="toast-msg"></div>
+            <button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase SDKs (v9 compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG  — user pastes Firebase values here OR via the setup UI
+// ═══════════════════════════════════════════════════════════════
+var FIREBASE_CONFIG = {
+    apiKey:            "AIzaSyDtjkCX0Zh6h0ehIWtULg91UeVIBu_wgbA",
+    authDomain:        "bluespring-51982.firebaseapp.com",
+    databaseURL:       "https://bluespring-51982-default-rtdb.firebaseio.com",
+    projectId:         "bluespring-51982",
+    storageBucket:     "bluespring-51982.firebasestorage.app",
+    messagingSenderId: "874579923598",
+    appId:             "1:874579923598:web:11c5f4e37ad2ed5ff76fdf",
+    measurementId:     "G-Y798W8VX0B"
+};
+
+// ═══════════════════════════════════════════════════════════════
+// SESSION  (localStorage — just the logged-in user object)
+// ═══════════════════════════════════════════════════════════════
+var SESSION = {
+    get:   function() { try { return JSON.parse(localStorage.getItem('bsr_session')); } catch(e) { return null; } },
+    set:   function(u) { localStorage.setItem('bsr_session', JSON.stringify(u)); },
+    clear: function() { localStorage.removeItem('bsr_session'); }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// FIRESTORE WRAPPER  (all async)
+// ═══════════════════════════════════════════════════════════════
+var FS = {
+    db: null,
+
+    // ── users ──
+    getUsers: function() {
+        return FS.db.collection('users').get().then(function(snap) {
+            return snap.docs.map(function(d) { return Object.assign({id: d.id}, d.data()); });
+        });
+    },
+    getUserByUsername: function(username) {
+        return FS.db.collection('users').where('username', '==', username).get().then(function(snap) {
+            if (snap.empty) return null;
+            return Object.assign({id: snap.docs[0].id}, snap.docs[0].data());
+        });
+    },
+    saveUser: function(user) {
+        var id = user.id;
+        var data = Object.assign({}, user);
+        delete data.id;
+        return FS.db.collection('users').doc(id).set(data);
+    },
+    deleteUser: function(id) {
+        return FS.db.collection('users').doc(id).delete();
+    },
+
+    // ── reports ──
+    getReports: function() {
+        return FS.db.collection('reports').get().then(function(snap) {
+            return snap.docs.map(function(d) { return Object.assign({id: d.id}, d.data()); });
+        });
+    },
+    getReportsByUser: function(userId) {
+        return FS.db.collection('reports').where('userId', '==', userId).get().then(function(snap) {
+            return snap.docs.map(function(d) { return Object.assign({id: d.id}, d.data()); });
+        });
+    },
+    saveReport: function(report) {
+        var id = report.id;
+        var data = Object.assign({}, report);
+        delete data.id;
+        return FS.db.collection('reports').doc(id).set(data);
+    },
+    deleteReport: function(id) {
+        return FS.db.collection('reports').doc(id).delete();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function isoNow() { return new Date().toISOString(); }
+function toDateStr(d) { return (d || new Date()).toISOString().split('T')[0]; }
+function todayStr()   { return toDateStr(); }
+function fmtDate(s)   { return new Date(s + 'T00:00:00').toLocaleDateString('en-US', {weekday:'short', year:'numeric', month:'short', day:'numeric'}); }
+function genId()      { return 'r' + Date.now() + Math.random().toString(36).slice(2, 6); }
+function cap(s)       { return s ? s[0].toUpperCase() + s.slice(1) : ''; }
+function moodIcon(m)  { var map = {excellent:'😄', good:'🙂', okay:'😐', challenging:'😕', difficult:'😞'}; return map[m] || '🙂'; }
+function pct(n, t)    { return t ? Math.round(n / t * 100) : 0; }
+
+function showToast(msg, type) {
+    var el = document.getElementById('app-toast');
+    var bg = type === 'error' ? 'bg-danger' : type === 'info' ? 'bg-primary' : 'bg-success';
+    el.className = 'toast align-items-center border-0 text-white ' + bg;
+    document.getElementById('toast-msg').textContent = msg;
+    new bootstrap.Toast(el, {delay: 3000}).show();
+}
+function statusBadge(s) {
+    if (s === 'completed')   return '<span class="badge-completed"><i class="fas fa-check me-1"></i>Completed</span>';
+    if (s === 'in-progress') return '<span class="badge-in-progress"><i class="fas fa-spinner me-1"></i>In Progress</span>';
+    return '<span class="badge-not-started"><i class="fas fa-hourglass me-1"></i>Not Started</span>';
+}
+function priBadge(p) {
+    var c = {high:'danger', medium:'warning', low:'success'}[p] || 'secondary';
+    var i = {high:'fa-fire', medium:'fa-minus', low:'fa-arrow-down'}[p] || 'fa-minus';
+    return '<span class="badge bg-' + c + '"><i class="fas ' + i + ' me-1"></i>' + cap(p) + '</span>';
+}
+function loadingHtml() {
+    return '<div class="loading-view"><div class="spinner-border"></div><p class="mt-3">Loading...</p></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHOW / HIDE PAGES
+// ═══════════════════════════════════════════════════════════════
+function showPage(id) {
+    var pages = ['setup-page', 'login-page', 'app-page'];
+    for (var i = 0; i < pages.length; i++) {
+        var el = document.getElementById(pages[i]);
+        el.style.display = 'none';
+    }
+    var target = document.getElementById(id);
+    target.style.display = (id === 'app-page') ? 'block' : 'flex';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETUP PAGE
+// ═══════════════════════════════════════════════════════════════
+function loadSavedConfig() {
+    try { return JSON.parse(localStorage.getItem('bsr_firebase_config')); } catch(e) { return null; }
+}
+function saveConfig(cfg) {
+    localStorage.setItem('bsr_firebase_config', JSON.stringify(cfg));
+}
+function configIsValid(cfg) {
+    return cfg && cfg.apiKey && cfg.apiKey.indexOf('PASTE') === -1 && cfg.projectId && cfg.projectId.indexOf('PASTE') === -1;
+}
+
+document.getElementById('cfg-save-btn').addEventListener('click', function() {
+    var cfg = {
+        apiKey:            document.getElementById('cfg-apiKey').value.trim(),
+        authDomain:        document.getElementById('cfg-authDomain').value.trim(),
+        projectId:         document.getElementById('cfg-projectId').value.trim(),
+        storageBucket:     document.getElementById('cfg-storageBucket').value.trim(),
+        messagingSenderId: document.getElementById('cfg-messagingSenderId').value.trim(),
+        appId:             document.getElementById('cfg-appId').value.trim()
+    };
+    var errEl = document.getElementById('setup-error');
+    if (!cfg.apiKey || !cfg.projectId || !cfg.appId) {
+        errEl.textContent = 'Please fill in at least: API Key, Project ID, and App ID.';
+        errEl.classList.remove('d-none');
+        return;
+    }
+    errEl.classList.add('d-none');
+    saveConfig(cfg);
+    initFirebase(cfg);
+});
+
+document.getElementById('reconfigure-link').addEventListener('click', function(e) {
+    e.preventDefault();
+    SESSION.clear();
+    showPage('setup-page');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════════════════
+function initFirebase(cfg) {
+    try {
+        if (firebase.apps.length === 0) {
+            firebase.initializeApp(cfg);
+        }
+        FS.db = firebase.firestore();
+        bootApp();
+    } catch(e) {
+        var errEl = document.getElementById('setup-error');
+        if (errEl) {
+            errEl.textContent = 'Firebase error: ' + e.message + '. Check your config values.';
+            errEl.classList.remove('d-none');
+        }
+        showPage('setup-page');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT  — runs after Firebase is ready
+// ═══════════════════════════════════════════════════════════════
+function bootApp() {
+    // Ensure at least one admin exists (first-run setup)
+    FS.getUsers().then(function(users) {
+        var adminExists = false;
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].role === 'admin') { adminExists = true; break; }
+        }
+        if (!adminExists) {
+            return FS.saveUser({id: 'admin', name: 'Administrator', username: 'admin', password: 'admin123', role: 'admin', department: 'Management', createdAt: isoNow()});
+        }
+    }).then(function() {
+        // Check for saved session
+        var saved = SESSION.get();
+        if (saved) {
+            return FS.getUsers().then(function(users) {
+                var fresh = null;
+                for (var i = 0; i < users.length; i++) {
+                    if (users[i].id === saved.id) { fresh = users[i]; break; }
+                }
+                if (fresh) {
+                    launchApp(fresh);
+                } else {
+                    SESSION.clear();
+                    showPage('login-page');
+                }
+            });
+        } else {
+            showPage('login-page');
+        }
+    }).catch(function(err) {
+        var errEl = document.getElementById('setup-error');
+        if (errEl) {
+            errEl.textContent = 'Cannot connect to database: ' + err.message + '. Check your Firestore rules are set to test mode.';
+            errEl.classList.remove('d-none');
+        }
+        showPage('setup-page');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var username = document.getElementById('login-user').value.trim();
+    var password = document.getElementById('login-pass').value;
+    var btn      = document.getElementById('login-btn');
+    var errEl    = document.getElementById('login-err');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+
+    FS.getUserByUsername(username).then(function(user) {
+        if (user && user.password === password) {
+            SESSION.set(user);
+            launchApp(user);
+        } else {
+            errEl.textContent = 'Invalid username or password.';
+            errEl.classList.remove('d-none');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Sign In';
+        }
+    }).catch(function(err) {
+        errEl.textContent = 'Login error: ' + err.message;
+        errEl.classList.remove('d-none');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Sign In';
+    });
+});
+
+document.getElementById('toggle-pwd').addEventListener('click', function() {
+    var p = document.getElementById('login-pass');
+    var i = this.querySelector('i');
+    p.type = (p.type === 'password') ? 'text' : 'password';
+    i.className = (p.type === 'password') ? 'fas fa-eye' : 'fas fa-eye-slash';
+});
+
+document.getElementById('logout-btn').addEventListener('click', function() {
+    SESSION.clear();
+    showPage('login-page');
+    document.getElementById('login-user').value = '';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-err').classList.add('d-none');
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('login-btn').innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Sign In';
+});
+
+// ═══════════════════════════════════════════════════════════════
+// APP LAUNCH & NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function launchApp(user) {
+    showPage('app-page');
+    document.getElementById('nav-name').textContent = user.name;
+    document.getElementById('nav-role').textContent = user.role === 'admin' ? 'Admin' : 'Staff';
+    buildSidebar(user);
+    navigate(user.role === 'admin' ? 'admin-dash' : 'staff-submit');
+}
+
+function buildSidebar(user) {
+    var sb = document.getElementById('sidebar');
+    if (user.role === 'admin') {
+        sb.innerHTML =
+            '<div class="sidebar-section">Admin</div>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-dash\')" id="snav-admin-dash"><i class="fas fa-tachometer-alt"></i>Dashboard</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-reports\')" id="snav-admin-reports"><i class="fas fa-file-alt"></i>All Reports</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-calendar\')" id="snav-admin-calendar"><i class="fas fa-calendar-alt"></i>Calendar</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-staff\')" id="snav-admin-staff"><i class="fas fa-users"></i>Staff Management</a>' +
+            '<div class="sidebar-section mt-3">Tools</div>' +
+            '<a class="sidebar-item" onclick="exportCSV()"><i class="fas fa-file-csv"></i>Export CSV</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-settings\')" id="snav-admin-settings"><i class="fas fa-cog"></i>Settings</a>';
+    } else {
+        sb.innerHTML =
+            '<div class="sidebar-section">My Work</div>' +
+            '<a class="sidebar-item" onclick="navigate(\'staff-submit\')" id="snav-staff-submit"><i class="fas fa-plus-circle"></i>Submit Report</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'staff-history\')" id="snav-staff-history"><i class="fas fa-history"></i>My History</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'staff-calendar\')" id="snav-staff-calendar"><i class="fas fa-calendar"></i>My Calendar</a>' +
+            '<div class="sidebar-section mt-3">Account</div>' +
+            '<a class="sidebar-item" onclick="new bootstrap.Modal(document.getElementById(\'pwdModal\')).show()"><i class="fas fa-key"></i>Change Password</a>';
+    }
+}
+
+function setNav(id) {
+    var items = document.querySelectorAll('.sidebar-item');
+    for (var i = 0; i < items.length; i++) items[i].classList.remove('active');
+    var el = document.getElementById('snav-' + id);
+    if (el) el.classList.add('active');
+}
+
+function navigate(view) {
+    setNav(view);
+    var mc = document.getElementById('main');
+    mc.innerHTML = loadingHtml();
+    loadView(view).catch(function(err) {
+        mc.innerHTML = '<div class="alert alert-danger m-3"><i class="fas fa-exclamation-circle me-2"></i>' + err.message + '</div>';
+        console.error(err);
+    });
+}
+
+function loadView(view) {
+    var mc = document.getElementById('main');
+    switch (view) {
+        case 'admin-dash':
+            return Promise.all([FS.getReports(), FS.getUsers()]).then(function(res) {
+                mc.innerHTML = buildAdminDash(res[0], res[1]);
+            });
+        case 'admin-reports':
+            return Promise.all([FS.getReports(), FS.getUsers()]).then(function(res) {
+                mc.innerHTML = buildAdminReports(res[0], res[1], _flt);
+                bindReportFilters(res[0], res[1]);
+            });
+        case 'admin-calendar':
+            return FS.getReports().then(function(rpts) {
+                CAL.staffOnly = false;
+                mc.innerHTML = buildCalendarShell();
+                drawCalCells(rpts);
+                document.getElementById('cal-prev').addEventListener('click', function() { calMove(-1, rpts); });
+                document.getElementById('cal-next').addEventListener('click', function() { calMove(1, rpts); });
+            });
+        case 'admin-staff':
+            return Promise.all([FS.getUsers(), FS.getReports()]).then(function(res) {
+                mc.innerHTML = buildStaffMgmt(res[0], res[1]);
+                bindStaffMgmt();
+            });
+        case 'admin-settings':
+            mc.innerHTML = buildSettings();
+            bindSettings();
+            return Promise.resolve();
+        case 'staff-submit':
+            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+                mc.innerHTML = buildSubmitForm(rpts);
+                bindSubmitForm(rpts);
+            });
+        case 'staff-history':
+            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+                mc.innerHTML = buildHistory(rpts);
+            });
+        case 'staff-calendar':
+            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+                CAL.staffOnly = true;
+                mc.innerHTML = buildCalendarShell();
+                drawCalCells(rpts);
+                document.getElementById('cal-prev').addEventListener('click', function() { calMove(-1, rpts); });
+                document.getElementById('cal-next').addEventListener('click', function() { calMove(1, rpts); });
+            });
+        default:
+            return Promise.resolve();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function buildAdminDash(rpts, users) {
+    var staff = users.filter(function(u) { return u.role === 'staff'; });
+    var t = todayStr();
+    var todayR = rpts.filter(function(r) { return r.date === t; });
+    var allTasks = [], done = 0, wip = 0, ns = 0, hrs = 0;
+    for (var i = 0; i < rpts.length; i++) {
+        for (var j = 0; j < rpts[i].tasks.length; j++) {
+            var tk = rpts[i].tasks[j];
+            allTasks.push(tk);
+            if (tk.status === 'completed')   done++;
+            if (tk.status === 'in-progress') wip++;
+            if (tk.status === 'not-started') ns++;
+            hrs += (tk.timeSpent || 0);
+        }
+    }
+    var submittedIds = {};
+    for (var i = 0; i < todayR.length; i++) submittedIds[todayR[i].userId] = true;
+    var missing = staff.filter(function(u) { return !submittedIds[u.id]; });
+    var recent = rpts.slice().sort(function(a,b) { return new Date(b.submittedAt) - new Date(a.submittedAt); }).slice(0, 6);
+
+    var alertHtml = missing.length > 0
+        ? '<div class="miss-alert mb-3"><i class="fas fa-exclamation-triangle me-2"></i><strong>' + missing.length + ' staff yet to submit today:</strong>' +
+          missing.map(function(u) { return '<span class="badge bg-warning text-dark ms-1">' + u.name + '</span>'; }).join('') + '</div>'
+        : '<div class="alert alert-success mb-3 py-2"><i class="fas fa-check-circle me-2"></i>All staff have submitted today\'s report!</div>';
+
+    var recentRows = recent.map(function(r) {
+        var dc=0,wc=0,nc=0;
+        for (var j=0;j<r.tasks.length;j++) {
+            if (r.tasks[j].status==='completed') dc++;
+            else if (r.tasks[j].status==='in-progress') wc++;
+            else nc++;
+        }
+        var b = (dc>0?'<span class="badge bg-success">'+dc+' done</span> ':'') +
+                (wc>0?'<span class="badge bg-warning text-dark">'+wc+' active</span> ':'') +
+                (nc>0?'<span class="badge bg-info">'+nc+' queued</span>':'');
+        return '<tr><td><strong>'+r.userName+'</strong><br><small class="text-muted">'+(r.department||'')+'</small></td>' +
+               '<td style="white-space:nowrap">'+fmtDate(r.date)+'</td><td>'+b+'</td>' +
+               '<td><button class="btn btn-sm btn-outline-primary" onclick="openReportModal(\''+r.id+'\')">View</button></td></tr>';
+    }).join('');
+
+    var staffRows = staff.map(function(u) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid #f0f0f0;">' +
+            '<div><strong>' + u.name + '</strong><br><small class="text-muted">' + (u.department||'—') + '</small></div>' +
+            '<span class="badge ' + (submittedIds[u.id] ? 'bg-success">Submitted' : 'bg-danger">Pending') + '</span></div>';
+    }).join('') || '<p class="text-muted text-center py-2">No staff yet</p>';
+
+    var total = allTasks.length;
+    return '<div class="section-title"><i class="fas fa-tachometer-alt"></i>Dashboard</div>' + alertHtml +
+        '<div class="row g-3 mb-4">' +
+        '<div class="col-6 col-lg-3"><div class="stat-card blue"><div class="stat-value">'+rpts.length+'</div><div class="stat-label"><i class="fas fa-file-alt me-1"></i>Total Reports</div></div></div>' +
+        '<div class="col-6 col-lg-3"><div class="stat-card green"><div class="stat-value">'+todayR.length+'/'+staff.length+'</div><div class="stat-label"><i class="fas fa-calendar-check me-1"></i>Today\'s Reports</div></div></div>' +
+        '<div class="col-6 col-lg-3"><div class="stat-card orange"><div class="stat-value">'+done+'</div><div class="stat-label"><i class="fas fa-check me-1"></i>Tasks Completed</div></div></div>' +
+        '<div class="col-6 col-lg-3"><div class="stat-card purple"><div class="stat-value">'+hrs.toFixed(0)+'h</div><div class="stat-label"><i class="fas fa-clock me-1"></i>Hours Logged</div></div></div>' +
+        '</div>' +
+        '<div class="row g-3 mb-4">' +
+        '<div class="col-lg-7"><div class="data-table"><div style="padding:1rem 1.5rem;border-bottom:1px solid #eee;font-weight:600;"><i class="fas fa-clock me-2 text-primary"></i>Recent Reports</div>' +
+        (recent.length ? '<table class="table table-hover mb-0"><thead><tr><th>Staff</th><th>Date</th><th>Tasks</th><th></th></tr></thead><tbody>'+recentRows+'</tbody></table>' :
+         '<div class="empty-state"><i class="fas fa-inbox"></i><p>No reports yet</p></div>') +
+        '</div></div>' +
+        '<div class="col-lg-5"><div class="data-table"><div style="padding:1rem 1.5rem;border-bottom:1px solid #eee;font-weight:600;"><i class="fas fa-users me-2 text-primary"></i>Today\'s Status</div><div style="padding:1rem;">'+staffRows+'</div></div></div>' +
+        '</div>' +
+        '<div class="data-table"><div style="padding:1rem 1.5rem;border-bottom:1px solid #eee;font-weight:600;"><i class="fas fa-chart-bar me-2 text-primary"></i>Task Breakdown</div><div style="padding:1.5rem;"><div class="row g-3 text-center">' +
+        '<div class="col-4"><div style="font-size:1.8rem;font-weight:700;color:#28a745;">'+done+'</div><div class="text-muted">Completed</div><div class="progress-bar-wrap" style="background:#d4edda;"><div style="height:100%;width:'+pct(done,total)+'%;background:#28a745;border-radius:4px;"></div></div></div>' +
+        '<div class="col-4"><div style="font-size:1.8rem;font-weight:700;color:#856404;">'+wip+'</div><div class="text-muted">In Progress</div><div class="progress-bar-wrap" style="background:#fff3cd;"><div style="height:100%;width:'+pct(wip,total)+'%;background:#ffc107;border-radius:4px;"></div></div></div>' +
+        '<div class="col-4"><div style="font-size:1.8rem;font-weight:700;color:#004085;">'+ns+'</div><div class="text-muted">Not Started</div><div class="progress-bar-wrap" style="background:#cce5ff;"><div style="height:100%;width:'+pct(ns,total)+'%;background:#007bff;border-radius:4px;"></div></div></div>' +
+        '</div></div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — ALL REPORTS
+// ═══════════════════════════════════════════════════════════════
+var _flt = {};
+function buildAdminReports(rpts, users, f) {
+    f = f || {};
+    var staffList = users.filter(function(u) { return u.role === 'staff'; });
+    var filtered = rpts.slice();
+    if (f.staffId) filtered = filtered.filter(function(r) { return r.userId === f.staffId; });
+    if (f.from)    filtered = filtered.filter(function(r) { return r.date >= f.from; });
+    if (f.to)      filtered = filtered.filter(function(r) { return r.date <= f.to; });
+    if (f.status)  filtered = filtered.filter(function(r) { return r.tasks.some(function(t){ return t.status===f.status; }); });
+    if (f.q) {
+        var q = f.q.toLowerCase();
+        filtered = filtered.filter(function(r) {
+            return r.userName.toLowerCase().indexOf(q) !== -1 ||
+                r.tasks.some(function(t) { return t.name.toLowerCase().indexOf(q) !== -1; });
+        });
+    }
+    filtered.sort(function(a,b) { return new Date(b.submittedAt) - new Date(a.submittedAt); });
+
+    var staffOpts = '<option value="">All Staff</option>' +
+        staffList.map(function(u) { return '<option value="'+u.id+'"'+(f.staffId===u.id?' selected':'')+'>'+u.name+'</option>'; }).join('');
+
+    var cards = filtered.length === 0
+        ? '<div class="empty-state data-table"><i class="fas fa-search"></i><p>No reports match your filters.</p></div>'
+        : filtered.map(function(r) {
+            var lines = r.tasks.map(function(tk) {
+                return '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;">'+
+                    statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+
+                    (tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+
+                    (tk.timeSpent?'<small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</small>':'')+
+                    '</div>';
+            }).join('');
+            return '<div class="report-card"><div class="rpt-header">' +
+                '<div><h6 class="mb-0"><i class="fas fa-user me-2 text-primary"></i>'+r.userName+' '+moodIcon(r.mood)+'</h6>' +
+                '<small class="text-muted">'+(r.department||'')+' &bull; '+fmtDate(r.date)+'</small></div>' +
+                '<button class="btn btn-sm btn-outline-primary" onclick="openReportModal(\''+r.id+'\')"><i class="fas fa-eye me-1"></i>Detail</button>' +
+                '</div>'+lines+(r.notes?'<div class="mt-2 text-muted" style="font-size:.85rem;border-top:1px solid #eee;padding-top:.5rem;"><i class="fas fa-sticky-note me-1"></i>'+r.notes+'</div>':'')+
+                '</div>';
+        }).join('');
+
+    return '<div class="section-title"><i class="fas fa-file-alt"></i>All Reports</div>' +
+        '<div class="data-table mb-3 p-3"><div class="row g-2">' +
+        '<div class="col-md-3"><select class="form-select form-select-sm" id="f-staff">'+staffOpts+'</select></div>' +
+        '<div class="col-md-2"><input type="date" class="form-control form-control-sm" id="f-from" value="'+(f.from||'')+'"></div>' +
+        '<div class="col-md-2"><input type="date" class="form-control form-control-sm" id="f-to" value="'+(f.to||'')+'"></div>' +
+        '<div class="col-md-2"><select class="form-select form-select-sm" id="f-status"><option value="">All Statuses</option>' +
+        '<option value="completed"'+(f.status==='completed'?' selected':'')+'>Completed</option>' +
+        '<option value="in-progress"'+(f.status==='in-progress'?' selected':'')+'>In Progress</option>' +
+        '<option value="not-started"'+(f.status==='not-started'?' selected':'')+'>Not Started</option></select></div>' +
+        '<div class="col-md-2"><input type="text" class="form-control form-control-sm" id="f-q" value="'+(f.q||'')+'" placeholder="Search..."></div>' +
+        '<div class="col-md-1 d-flex gap-1">' +
+        '<button class="btn btn-sm btn-primary flex-fill" id="f-apply-btn" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-search"></i></button>' +
+        '<button class="btn btn-sm btn-outline-secondary flex-fill" id="f-clear-btn"><i class="fas fa-times"></i></button>' +
+        '</div></div></div>' +
+        '<div class="text-muted mb-2" style="font-size:.9rem;">Showing <strong>'+filtered.length+'</strong> report(s)</div>' + cards;
+}
+function bindReportFilters(allRpts, allUsers) {
+    var ab = document.getElementById('f-apply-btn');
+    var cb = document.getElementById('f-clear-btn');
+    if (ab) ab.addEventListener('click', function() {
+        _flt = { staffId: document.getElementById('f-staff').value, from: document.getElementById('f-from').value,
+                 to: document.getElementById('f-to').value, status: document.getElementById('f-status').value,
+                 q: document.getElementById('f-q').value };
+        document.getElementById('main').innerHTML = buildAdminReports(allRpts, allUsers, _flt);
+        bindReportFilters(allRpts, allUsers);
+        setNav('admin-reports');
+    });
+    if (cb) cb.addEventListener('click', function() { _flt = {}; navigate('admin-reports'); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR
+// ═══════════════════════════════════════════════════════════════
+var CAL = { year: new Date().getFullYear(), month: new Date().getMonth(), staffOnly: false };
+
+function buildCalendarShell() {
+    return '<div class="section-title"><i class="fas fa-calendar-alt"></i>' + (CAL.staffOnly ? 'My Calendar' : 'Team Calendar') + '</div>' +
+        '<div class="d-flex gap-3 mb-3 flex-wrap" style="font-size:.85rem;">' +
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#28a745;vertical-align:middle;margin-right:4px;"></span>Completed</span>' +
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#ffc107;vertical-align:middle;margin-right:4px;"></span>In Progress</span>' +
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#007bff;vertical-align:middle;margin-right:4px;"></span>Not Started</span>' +
+        '</div>' +
+        '<div class="data-table p-3">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">' +
+        '<button class="btn btn-outline-primary btn-sm" id="cal-prev"><i class="fas fa-chevron-left"></i></button>' +
+        '<h5 class="mb-0" id="cal-title"></h5>' +
+        '<button class="btn btn-outline-primary btn-sm" id="cal-next"><i class="fas fa-chevron-right"></i></button>' +
+        '</div>' +
+        '<div class="calendar-grid" id="cal-grid">' +
+        '<div class="cal-header-cell">Sun</div><div class="cal-header-cell">Mon</div><div class="cal-header-cell">Tue</div>' +
+        '<div class="cal-header-cell">Wed</div><div class="cal-header-cell">Thu</div><div class="cal-header-cell">Fri</div>' +
+        '<div class="cal-header-cell">Sat</div>' +
+        '</div></div>';
+}
+
+function calMove(d, rpts) {
+    CAL.month += d;
+    if (CAL.month > 11) { CAL.month = 0; CAL.year++; }
+    if (CAL.month < 0)  { CAL.month = 11; CAL.year--; }
+    drawCalCells(rpts);
+}
+
+function drawCalCells(rpts) {
+    var grid  = document.getElementById('cal-grid');
+    var title = document.getElementById('cal-title');
+    if (!grid) return;
+    title.textContent = new Date(CAL.year, CAL.month, 1).toLocaleDateString('en-US', {month:'long', year:'numeric'});
+    var old = grid.querySelectorAll('.cal-cell');
+    for (var i = 0; i < old.length; i++) old[i].remove();
+
+    var dateMap = {};
+    for (var i = 0; i < rpts.length; i++) {
+        var r = rpts[i];
+        if (!dateMap[r.date]) dateMap[r.date] = [];
+        for (var j = 0; j < r.tasks.length; j++) {
+            dateMap[r.date].push({ name: r.tasks[j].name, status: r.tasks[j].status, priority: r.tasks[j].priority,
+                description: r.tasks[j].description, category: r.tasks[j].category, timeSpent: r.tasks[j].timeSpent, userName: r.userName });
+        }
+    }
+    var firstDay = new Date(CAL.year, CAL.month, 1).getDay();
+    var days     = new Date(CAL.year, CAL.month + 1, 0).getDate();
+    var prevDays = new Date(CAL.year, CAL.month, 0).getDate();
+    var t        = todayStr();
+    for (var i = firstDay - 1; i >= 0; i--) grid.appendChild(makeCalCell(prevDays - i, CAL.year, CAL.month - 1, true, t, dateMap));
+    for (var d = 1; d <= days; d++)          grid.appendChild(makeCalCell(d, CAL.year, CAL.month, false, t, dateMap));
+    var rem = (firstDay + days) % 7 === 0 ? 0 : 7 - ((firstDay + days) % 7);
+    for (var d = 1; d <= rem; d++)           grid.appendChild(makeCalCell(d, CAL.year, CAL.month + 1, true, t, dateMap));
+}
+
+function makeCalCell(day, year, month, other, today, dateMap) {
+    var ds    = toDateStr(new Date(year, month, day));
+    var tasks = dateMap[ds] || [];
+    var cell  = document.createElement('div');
+    cell.className = 'cal-cell' + (other?' other-month':'') + (ds===today?' today':'') + (tasks.length?' clickable':'');
+    var dn = document.createElement('div'); dn.className = 'cal-day-num'; dn.textContent = day;
+    cell.appendChild(dn);
+    tasks.slice(0, 2).forEach(function(tk) {
+        var lbl = document.createElement('span'); lbl.className = 'cal-task-lbl ' + tk.status; lbl.textContent = tk.name; lbl.title = tk.name;
+        cell.appendChild(lbl);
+    });
+    if (tasks.length > 2) { var m = document.createElement('div'); m.style.cssText='font-size:.7rem;color:#888;'; m.textContent = '+' + (tasks.length-2) + ' more'; cell.appendChild(m); }
+    if (tasks.length) { (function(d,tl){ cell.addEventListener('click', function(){ openDayModal(d,tl); }); })(ds, tasks); }
+    return cell;
+}
+
+function openDayModal(ds, tasks) {
+    document.getElementById('dayModalTitle').textContent = 'Tasks — ' + fmtDate(ds);
+    document.getElementById('dayModalBody').innerHTML = tasks.map(function(t) {
+        return '<div class="task-detail-item">' +
+            '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;"><strong>'+t.name+'</strong>' +
+            (t.userName?'<small class="text-muted">by '+t.userName+'</small>':'')+
+            '<div>'+statusBadge(t.status)+' '+priBadge(t.priority)+'</div></div>'+
+            (t.description?'<div class="text-muted mt-1" style="font-size:.9rem;">'+t.description+'</div>':'')+
+            '<div class="mt-1">'+(t.category?'<span class="badge bg-secondary">'+t.category+'</span>':'')+
+            (t.timeSpent?'<span class="badge bg-light text-dark ms-1"><i class="fas fa-clock me-1"></i>'+t.timeSpent+'h</span>':'')+
+            '</div></div>';
+    }).join('');
+    new bootstrap.Modal(document.getElementById('dayModal')).show();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REPORT DETAIL MODAL
+// ═══════════════════════════════════════════════════════════════
+function openReportModal(id) {
+    document.getElementById('rptModalTitle').textContent = 'Loading...';
+    document.getElementById('rptModalBody').innerHTML = loadingHtml();
+    new bootstrap.Modal(document.getElementById('rptModal')).show();
+    FS.getReports().then(function(rpts) {
+        var r = null;
+        for (var i = 0; i < rpts.length; i++) { if (rpts[i].id === id) { r = rpts[i]; break; } }
+        if (!r) return;
+        var hrs = r.tasks.reduce(function(s,t) { return s + (t.timeSpent||0); }, 0);
+        document.getElementById('rptModalTitle').textContent = r.userName + ' — ' + fmtDate(r.date);
+        document.getElementById('rptModalBody').innerHTML =
+            '<div class="row g-2 mb-3">' +
+            '<div class="col-sm-6"><div class="text-muted" style="font-size:.8rem;">Staff</div><strong>'+r.userName+'</strong>'+(r.department?' <span class="badge bg-secondary">'+r.department+'</span>':'')+' </div>' +
+            '<div class="col-sm-6"><div class="text-muted" style="font-size:.8rem;">Submitted</div><strong>'+new Date(r.submittedAt).toLocaleString()+'</strong></div>' +
+            '<div class="col-sm-6"><div class="text-muted" style="font-size:.8rem;">Mood</div><strong>'+moodIcon(r.mood)+' '+cap(r.mood)+'</strong></div>' +
+            '<div class="col-sm-6"><div class="text-muted" style="font-size:.8rem;">Total Hours</div><strong>'+hrs.toFixed(1)+'h</strong></div>' +
+            '</div><h6 class="mb-2"><i class="fas fa-tasks me-2 text-primary"></i>Tasks ('+r.tasks.length+')</h6>' +
+            r.tasks.map(function(tk) {
+                return '<div class="task-detail-item">' +
+                    '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;"><strong>'+tk.name+'</strong><div>'+statusBadge(tk.status)+' '+priBadge(tk.priority)+'</div></div>'+
+                    (tk.description?'<div class="text-muted mt-1" style="font-size:.9rem;">'+tk.description+'</div>':'')+
+                    '<div class="mt-1">'+(tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+
+                    (tk.timeSpent?'<span class="badge bg-light text-dark ms-1"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</span>':'')+
+                    '</div></div>';
+            }).join('') +
+            (r.notes?'<div class="mt-3 p-3" style="background:#f8f9fa;border-radius:8px;"><h6><i class="fas fa-sticky-note me-2 text-warning"></i>Notes</h6><p class="mb-0 text-muted">'+r.notes+'</p></div>':'');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAFF MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+function buildStaffMgmt(users, rpts) {
+    var staff = users.filter(function(u) { return u.role === 'staff'; });
+    var rows = staff.map(function(u) {
+        var ur = rpts.filter(function(r){ return r.userId===u.id; }).sort(function(a,b){ return new Date(b.submittedAt)-new Date(a.submittedAt); });
+        return '<tr><td><strong>'+u.name+'</strong></td><td><code>'+u.username+'</code></td>' +
+            '<td>'+(u.department||'<span class="text-muted">—</span>')+'</td>' +
+            '<td><span class="badge bg-primary">'+ur.length+'</span></td>' +
+            '<td>'+(ur.length ? fmtDate(ur[0].date) : '<span class="text-muted">Never</span>')+'</td>' +
+            '<td><button class="btn btn-sm btn-outline-danger" data-uid="'+u.id+'" data-uname="'+u.name+'"><i class="fas fa-trash"></i></button></td></tr>';
+    }).join('');
+    return '<div class="d-flex justify-content-between align-items-center mb-3">' +
+        '<div class="section-title mb-0"><i class="fas fa-users"></i>Staff Management</div>' +
+        '<button class="btn btn-primary" id="open-add-staff" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-plus me-1"></i>Add Staff</button></div>' +
+        '<div class="data-table"><table class="table table-hover mb-0">' +
+        '<thead><tr><th>Name</th><th>Username</th><th>Department</th><th>Reports</th><th>Last Report</th><th>Actions</th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="6" class="text-center text-muted py-4">No staff yet. Add some!</td></tr>') + '</tbody></table></div>';
+}
+function bindStaffMgmt() {
+    var addBtn = document.getElementById('open-add-staff');
+    if (addBtn) addBtn.addEventListener('click', function() { new bootstrap.Modal(document.getElementById('addStaffModal')).show(); });
+    var delBtns = document.querySelectorAll('[data-uid]');
+    for (var i = 0; i < delBtns.length; i++) {
+        (function(btn) {
+            btn.addEventListener('click', function() {
+                var uid = btn.getAttribute('data-uid'), uname = btn.getAttribute('data-uname');
+                if (!confirm('Remove ' + uname + '? Their reports will be kept.')) return;
+                FS.deleteUser(uid).then(function() { navigate('admin-staff'); showToast(uname + ' removed.', 'info'); });
+            });
+        })(delBtns[i]);
+    }
+}
+
+document.getElementById('sf-save-btn').addEventListener('click', function() {
+    var name  = document.getElementById('sf-name').value.trim();
+    var uname = document.getElementById('sf-user').value.trim().toLowerCase();
+    var pass  = document.getElementById('sf-pass').value;
+    var dept  = document.getElementById('sf-dept').value.trim();
+    var err   = document.getElementById('sf-err');
+    if (!name||!uname||!pass) { err.textContent='Fill in all required fields.'; err.classList.remove('d-none'); return; }
+    FS.getUserByUsername(uname).then(function(existing) {
+        if (existing) { err.textContent='Username already exists.'; err.classList.remove('d-none'); return; }
+        var newUser = { id: genId(), name: name, username: uname, password: pass, role: 'staff', department: dept, createdAt: isoNow() };
+        return FS.saveUser(newUser).then(function() {
+            bootstrap.Modal.getInstance(document.getElementById('addStaffModal')).hide();
+            document.getElementById('sf-name').value=''; document.getElementById('sf-user').value='';
+            document.getElementById('sf-pass').value=''; document.getElementById('sf-dept').value='';
+            err.classList.add('d-none');
+            navigate('admin-staff');
+            showToast('Staff member "' + name + '" added!');
+        });
+    }).catch(function(e) { err.textContent = 'Error: ' + e.message; err.classList.remove('d-none'); });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════
+function buildSettings() {
+    var admin = SESSION.get();
+    return '<div class="section-title"><i class="fas fa-cog"></i>Settings</div>' +
+        '<div class="data-table p-4" style="max-width:600px;">' +
+        '<h6 class="mb-3">Admin Account</h6>' +
+        '<div class="mb-3"><label class="form-label">Full Name</label><input type="text" class="form-control" id="set-name" value="'+admin.name+'"></div>' +
+        '<div class="mb-3"><label class="form-label">Department</label><input type="text" class="form-control" id="set-dept" value="'+(admin.department||'')+'"></div>' +
+        '<button class="btn btn-primary me-2" id="save-settings-btn" style="background:#1a6fc4;border-color:#1a6fc4;">Save Changes</button>' +
+        '<button class="btn btn-outline-secondary" id="open-pwd-btn"><i class="fas fa-key me-1"></i>Change Password</button>' +
+        '<hr><h6 class="mb-2 text-danger">Danger Zone</h6>' +
+        '<button class="btn btn-outline-danger" id="reset-data-btn"><i class="fas fa-trash me-1"></i>Delete All Reports &amp; Staff</button>' +
+        '</div>';
+}
+function bindSettings() {
+    var sb = document.getElementById('save-settings-btn');
+    var pb = document.getElementById('open-pwd-btn');
+    var rb = document.getElementById('reset-data-btn');
+    if (sb) sb.addEventListener('click', function() {
+        var name = document.getElementById('set-name').value.trim();
+        var dept = document.getElementById('set-dept').value.trim();
+        if (!name) { showToast('Name required.', 'error'); return; }
+        var user = SESSION.get();
+        FS.saveUser(Object.assign({}, user, {name:name, department:dept})).then(function() {
+            var updated = Object.assign({}, user, {name:name, department:dept});
+            SESSION.set(updated);
+            document.getElementById('nav-name').textContent = name;
+            showToast('Settings saved!');
+        });
+    });
+    if (pb) pb.addEventListener('click', function() { new bootstrap.Modal(document.getElementById('pwdModal')).show(); });
+    if (rb) rb.addEventListener('click', function() {
+        if (!confirm('Delete ALL reports and all non-admin staff accounts? This cannot be undone.')) return;
+        Promise.all([FS.getReports(), FS.getUsers()]).then(function(res) {
+            var delOps = res[0].map(function(r) { return FS.deleteReport(r.id); });
+            res[1].filter(function(u){ return u.role !== 'admin'; }).forEach(function(u) { delOps.push(FS.deleteUser(u.id)); });
+            return Promise.all(delOps);
+        }).then(function() { showToast('All data deleted.', 'info'); navigate('admin-dash'); });
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHANGE PASSWORD
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('cp-save-btn').addEventListener('click', function() {
+    var cur=document.getElementById('cp-cur').value, nw=document.getElementById('cp-new').value, conf=document.getElementById('cp-conf').value;
+    var err=document.getElementById('cp-err');
+    var user=SESSION.get();
+    FS.getUsers().then(function(users) {
+        var found=null; for(var i=0;i<users.length;i++){if(users[i].id===user.id){found=users[i];break;}}
+        if(!found||found.password!==cur){err.textContent='Current password incorrect.';err.classList.remove('d-none');return;}
+        if(nw.length<4){err.textContent='Password must be at least 4 characters.';err.classList.remove('d-none');return;}
+        if(nw!==conf){err.textContent='Passwords do not match.';err.classList.remove('d-none');return;}
+        return FS.saveUser(Object.assign({},found,{id:user.id,password:nw})).then(function(){
+            bootstrap.Modal.getInstance(document.getElementById('pwdModal')).hide();
+            document.getElementById('cp-cur').value=''; document.getElementById('cp-new').value=''; document.getElementById('cp-conf').value='';
+            err.classList.add('d-none');
+            SESSION.set(Object.assign({},user,{password:nw}));
+            showToast('Password updated!');
+        });
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// STAFF — SUBMIT FORM
+// ═══════════════════════════════════════════════════════════════
+var _taskSeq = 0;
+var CATS = ['Development','Design','Testing','Documentation','Meeting','Review','DevOps','Research','Bug Fix','Planning','Content','Support','Other'];
+
+function buildSubmitForm(rpts) {
+    var user = SESSION.get(), t = todayStr(), existing = null;
+    for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === t) { existing = rpts[i]; break; } }
+    _taskSeq = 0;
+    var taskRows = (existing && existing.tasks.length) ? existing.tasks.map(function(tk){ return buildTaskRow(tk); }).join('') : buildTaskRow(null);
+    var moodOpts = [{v:'excellent',l:'Excellent'},{v:'good',l:'Good'},{v:'okay',l:'Okay'},{v:'challenging',l:'Challenging'},{v:'difficult',l:'Difficult'}]
+        .map(function(m){ return '<option value="'+m.v+'"'+((existing?existing.mood===m.v:m.v==='good')?' selected':'')+'>'+moodIcon(m.v)+' '+m.l+'</option>'; }).join('');
+    var delBtn = existing ? '<button type="button" class="btn btn-outline-danger" id="del-rpt-btn" data-rid="'+existing.id+'"><i class="fas fa-trash me-1"></i>Delete</button>' : '';
+    return '<div class="section-title"><i class="fas fa-'+(existing?'edit':'plus-circle')+'"></i>'+(existing?"Edit Today's Report":"Submit Daily Report")+'</div>' +
+        (existing?'<div class="alert alert-info mb-3 py-2"><i class="fas fa-info-circle me-2"></i>You already submitted today. Update it below.</div>':'') +
+        '<div class="data-table p-4" style="max-width:820px;"><form id="rpt-form">' +
+        '<div class="row g-3 mb-3">' +
+        '<div class="col-md-6"><label class="form-label">Date</label><input type="date" class="form-control" id="rpt-date" value="'+t+'" max="'+t+'"></div>' +
+        '<div class="col-md-6"><label class="form-label">Overall Mood</label><select class="form-select" id="rpt-mood">'+moodOpts+'</select></div>' +
+        '</div>' +
+        '<div class="mb-3"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">' +
+        '<label class="form-label mb-0">Tasks <span class="text-danger">*</span></label>' +
+        '<button type="button" class="btn btn-sm btn-outline-primary" id="add-task-btn"><i class="fas fa-plus me-1"></i>Add Task</button></div>' +
+        '<div id="tasks-wrap">'+taskRows+'</div></div>' +
+        '<div class="mb-4"><label class="form-label">Notes / Blockers</label><textarea class="form-control" id="rpt-notes" rows="3" placeholder="Any notes, blockers...">'+(existing?existing.notes:'')+'</textarea></div>' +
+        '<div id="rpt-err" class="alert alert-danger d-none py-2 mb-3"></div>' +
+        '<div class="d-flex gap-2"><button type="submit" class="btn btn-primary" id="rpt-submit-btn" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-'+(existing?'save':'paper-plane')+' me-2"></i>'+(existing?'Update Report':'Submit Report')+'</button>'+delBtn+'</div>' +
+        '</form></div>';
+}
+
+function buildTaskRow(task) {
+    var id = _taskSeq++;
+    var catOpts = '<option value="">Category</option>' + CATS.map(function(c){ return '<option value="'+c+'"'+(task&&task.category===c?' selected':'')+'>'+c+'</option>'; }).join('');
+    var ss = function(v){ return (task?task.status===v:v==='not-started')?' selected':''; };
+    var ps = function(v){ return (task?task.priority===v:v==='medium')?' selected':''; };
+    return '<div class="task-item" id="tr-'+id+'">' +
+        '<button type="button" class="rm-btn" data-tid="'+id+'"><i class="fas fa-times"></i></button>' +
+        '<div class="row g-2">' +
+        '<div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Task name *" data-f="name" value="'+(task?task.name||'':'')+'"></div>' +
+        '<div class="col-md-3"><select class="form-select form-select-sm" data-f="status"><option value="not-started"'+ss('not-started')+'>Not Started</option><option value="in-progress"'+ss('in-progress')+'>In Progress</option><option value="completed"'+ss('completed')+'>Completed</option></select></div>' +
+        '<div class="col-md-3"><select class="form-select form-select-sm" data-f="priority"><option value="low"'+ps('low')+'>Low</option><option value="medium"'+ps('medium')+'>Medium</option><option value="high"'+ps('high')+'>High</option></select></div>' +
+        '<div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Description (optional)" data-f="description" value="'+(task?task.description||'':'')+'"></div>' +
+        '<div class="col-md-3"><select class="form-select form-select-sm" data-f="category">'+catOpts+'</select></div>' +
+        '<div class="col-md-3"><div class="input-group input-group-sm"><input type="number" class="form-control" placeholder="Hours" data-f="timeSpent" value="'+(task&&task.timeSpent?task.timeSpent:'')+'" min="0" max="24" step="0.5"><span class="input-group-text">h</span></div></div>' +
+        '</div></div>';
+}
+
+function bindSubmitForm(rpts) {
+    var form = document.getElementById('rpt-form');
+    var addBtn = document.getElementById('add-task-btn');
+    var delBtn = document.getElementById('del-rpt-btn');
+    var wrap = document.getElementById('tasks-wrap');
+    if (form) form.addEventListener('submit', function(e) { e.preventDefault(); doSubmitReport(rpts); });
+    if (addBtn) addBtn.addEventListener('click', function() { wrap.insertAdjacentHTML('beforeend', buildTaskRow(null)); bindRmBtns(); });
+    if (delBtn) delBtn.addEventListener('click', function() {
+        var rid = delBtn.getAttribute('data-rid');
+        if (!confirm('Delete this report?')) return;
+        FS.deleteReport(rid).then(function() { showToast('Report deleted.','info'); navigate('staff-submit'); });
+    });
+    bindRmBtns();
+}
+function bindRmBtns() {
+    var btns = document.querySelectorAll('.rm-btn');
+    for (var i = 0; i < btns.length; i++) {
+        (function(btn) { btn.onclick = function() { var r=document.getElementById('tr-'+btn.getAttribute('data-tid')); if(r) r.remove(); }; })(btns[i]);
+    }
+}
+function collectTasks() {
+    var rows = document.getElementById('tasks-wrap').querySelectorAll('.task-item');
+    var tasks = [];
+    for (var i = 0; i < rows.length; i++) {
+        var name = rows[i].querySelector('[data-f="name"]').value.trim();
+        if (!name) continue;
+        tasks.push({ id: genId(), name: name,
+            description: rows[i].querySelector('[data-f="description"]').value.trim(),
+            status:      rows[i].querySelector('[data-f="status"]').value,
+            priority:    rows[i].querySelector('[data-f="priority"]').value,
+            category:    rows[i].querySelector('[data-f="category"]').value,
+            timeSpent:   parseFloat(rows[i].querySelector('[data-f="timeSpent"]').value) || null });
+    }
+    return tasks;
+}
+function doSubmitReport(rpts) {
+    var user  = SESSION.get();
+    var date  = document.getElementById('rpt-date').value;
+    var mood  = document.getElementById('rpt-mood').value;
+    var notes = document.getElementById('rpt-notes').value.trim();
+    var tasks = collectTasks();
+    var errEl = document.getElementById('rpt-err');
+    var btn   = document.getElementById('rpt-submit-btn');
+    if (!tasks.length) { errEl.textContent = 'Add at least one task.'; errEl.classList.remove('d-none'); return; }
+    errEl.classList.add('d-none');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    var existing = null;
+    for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === date) { existing = rpts[i]; break; } }
+    var report = { id: existing ? existing.id : genId(), userId: user.id, userName: user.name, department: user.department||'', date: date, submittedAt: isoNow(), tasks: tasks, notes: notes, mood: mood };
+    FS.saveReport(report).then(function() {
+        showToast(existing ? 'Report updated!' : 'Report submitted!');
+        navigate('staff-history');
+    }).catch(function(e) { errEl.textContent='Error: '+e.message; errEl.classList.remove('d-none'); btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane me-2"></i>Submit Report'; });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAFF — HISTORY
+// ═══════════════════════════════════════════════════════════════
+function buildHistory(rpts) {
+    rpts.sort(function(a,b){ return new Date(b.submittedAt)-new Date(a.submittedAt); });
+    var done=0, total=0, hrs=0;
+    for (var i=0;i<rpts.length;i++) { for(var j=0;j<rpts[i].tasks.length;j++) { total++; if(rpts[i].tasks[j].status==='completed') done++; hrs+=(rpts[i].tasks[j].timeSpent||0); } }
+    var cards = rpts.length === 0
+        ? '<div class="empty-state data-table"><i class="fas fa-file-alt"></i><p>No reports yet.</p><button class="btn btn-primary" onclick="navigate(\'staff-submit\')" style="background:#1a6fc4;">Submit First Report</button></div>'
+        : rpts.map(function(r) {
+            var lines = r.tasks.map(function(tk){
+                return '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;">'+statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+(tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+(tk.timeSpent?'<small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</small>':'')+' </div>';
+            }).join('');
+            return '<div class="report-card"><div class="rpt-header">' +
+                '<div><h6 class="mb-0">'+fmtDate(r.date)+' '+moodIcon(r.mood)+'</h6><small class="text-muted">Submitted '+new Date(r.submittedAt).toLocaleString()+'</small></div>' +
+                '<button class="btn btn-sm btn-outline-primary" data-edit-date="'+r.date+'"><i class="fas fa-edit me-1"></i>Edit</button></div>'+
+                lines+(r.notes?'<div class="mt-2 text-muted" style="font-size:.85rem;border-top:1px solid #eee;padding-top:.5rem;"><i class="fas fa-sticky-note me-1"></i>'+r.notes+'</div>':'')+
+                '</div>';
+        }).join('');
+    return '<div class="section-title"><i class="fas fa-history"></i>My Report History</div>' +
+        '<div class="row g-3 mb-4">' +
+        '<div class="col-sm-4"><div class="stat-card blue"><div class="stat-value">'+rpts.length+'</div><div class="stat-label">Total Reports</div></div></div>' +
+        '<div class="col-sm-4"><div class="stat-card green"><div class="stat-value">'+done+'/'+total+'</div><div class="stat-label">Tasks Completed</div></div></div>' +
+        '<div class="col-sm-4"><div class="stat-card orange"><div class="stat-value">'+hrs.toFixed(1)+'h</div><div class="stat-label">Hours Logged</div></div></div>' +
+        '</div>' + cards;
+}
+
+// Edit button on history cards
+document.getElementById('main').addEventListener('click', function(e) {
+    var btn = e.target.closest ? e.target.closest('[data-edit-date]') : (e.target.getAttribute && e.target.getAttribute('data-edit-date') ? e.target : null);
+    if (btn) {
+        var date = btn.getAttribute('data-edit-date');
+        navigate('staff-submit');
+        setTimeout(function() { var el = document.getElementById('rpt-date'); if(el) el.value = date; }, 200);
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════════════════════
+function exportCSV() {
+    document.getElementById('main').innerHTML = loadingHtml();
+    FS.getReports().then(function(rpts) {
+        if (!rpts.length) { showToast('No reports to export.','info'); navigate('admin-dash'); return; }
+        var rows = [['Date','Staff','Department','Task','Description','Status','Priority','Category','Hours','Notes','Mood','Submitted At']];
+        rpts.forEach(function(r) { r.tasks.forEach(function(tk) {
+            rows.push([r.date,r.userName,r.department||'',tk.name,tk.description||'',tk.status,tk.priority,tk.category||'',tk.timeSpent||'',r.notes||'',r.mood,r.submittedAt]);
+        }); });
+        var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+        a.download = 'bluespring_reports_' + todayStr() + '.csv';
+        a.click();
+        showToast('CSV exported!');
+        navigate('admin-dash');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT SEQUENCE
+// ═══════════════════════════════════════════════════════════════
+(function() {
+    // Hide everything first
+    document.getElementById('setup-page').style.display = 'none';
+    document.getElementById('login-page').style.display = 'none';
+    document.getElementById('app-page').style.display   = 'none';
+
+    // Try saved config from localStorage first, then fall back to hardcoded
+    var savedCfg = loadSavedConfig();
+    var cfg = configIsValid(savedCfg) ? savedCfg : (configIsValid(FIREBASE_CONFIG) ? FIREBASE_CONFIG : null);
+
+    if (cfg) {
+        initFirebase(cfg);
+    } else {
+        showPage('setup-page');
+    }
+})();
+</script>
+</body>
+</html>
