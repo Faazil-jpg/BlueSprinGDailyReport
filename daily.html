@@ -63,6 +63,10 @@
         .form-label { font-weight:500; color:#444; }
         .progress-bar-wrap { height:8px; border-radius:4px; margin-top:.5rem; }
         .loading-view { text-align:center; padding:4rem 2rem; color:#888; }
+        .cal-task-lbl.overdue { background:#f8d7da; color:#721c24; }
+        .cal-cell.has-overdue { border-color:#dc3545 !important; }
+        .badge-overdue { background:#f8d7da; color:#721c24; border-radius:20px; padding:3px 10px; font-size:.8rem; display:inline-block; }
+        .task-item.assigned-task { border-left:3px solid #1a6fc4; }
         .loading-view .spinner-border { width:2.5rem; height:2.5rem; color:#1a6fc4; }
         .step-num { width:32px; height:32px; border-radius:50%; background:#1a6fc4; color:white; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.9rem; }
         .step-row { display:flex; align-items:flex-start; gap:1rem; margin-bottom:1.2rem; }
@@ -168,10 +172,6 @@
                 <i class="fas fa-sign-in-alt me-2"></i>Sign In
             </button>
         </form>
-        <hr>
-       <div class="text-center" style="font-size:.8rem;">
-            <a href="#" id="reconfigure-link" class="text-muted" style="font-size:.75rem;"><i class="fas fa-cog me-1"></i>Reconfigure Firebase</a>
-        </div>
     </div>
 </div>
 
@@ -357,6 +357,7 @@ function genId()      { return 'r' + Date.now() + Math.random().toString(36).sli
 function cap(s)       { return s ? s[0].toUpperCase() + s.slice(1) : ''; }
 function moodIcon(m)  { var map = {excellent:'😄', good:'🙂', okay:'😐', challenging:'😕', difficult:'😞'}; return map[m] || '🙂'; }
 function pct(n, t)    { return t ? Math.round(n / t * 100) : 0; }
+function isOverdue(dateStr, status) { return dateStr < todayStr() && status !== 'completed'; }
 
 function showToast(msg, type) {
     var el = document.getElementById('app-toast');
@@ -423,12 +424,6 @@ document.getElementById('cfg-save-btn').addEventListener('click', function() {
     errEl.classList.add('d-none');
     saveConfig(cfg);
     initFirebase(cfg);
-});
-
-document.getElementById('reconfigure-link').addEventListener('click', function(e) {
-    e.preventDefault();
-    SESSION.clear();
-    showPage('setup-page');
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -560,6 +555,7 @@ function buildSidebar(user) {
             '<a class="sidebar-item" onclick="navigate(\'admin-reports\')" id="snav-admin-reports"><i class="fas fa-file-alt"></i>All Reports</a>' +
             '<a class="sidebar-item" onclick="navigate(\'admin-calendar\')" id="snav-admin-calendar"><i class="fas fa-calendar-alt"></i>Calendar</a>' +
             '<a class="sidebar-item" onclick="navigate(\'admin-staff\')" id="snav-admin-staff"><i class="fas fa-users"></i>Staff Management</a>' +
+            '<a class="sidebar-item" onclick="navigate(\'admin-assign\')" id="snav-admin-assign"><i class="fas fa-tasks"></i>Assign Tasks</a>' +
             '<div class="sidebar-section mt-3">Tools</div>' +
             '<a class="sidebar-item" onclick="exportCSV()"><i class="fas fa-file-csv"></i>Export CSV</a>' +
             '<a class="sidebar-item" onclick="navigate(\'admin-settings\')" id="snav-admin-settings"><i class="fas fa-cog"></i>Settings</a>';
@@ -616,6 +612,11 @@ function loadView(view) {
                 mc.innerHTML = buildStaffMgmt(res[0], res[1]);
                 bindStaffMgmt();
             });
+        case 'admin-assign':
+            return FS.getUsers().then(function(users) {
+                mc.innerHTML = buildAdminAssign(users);
+                bindAdminAssign(users);
+            });
         case 'admin-settings':
             mc.innerHTML = buildSettings();
             bindSettings();
@@ -670,6 +671,22 @@ function buildAdminDash(rpts, users) {
           missing.map(function(u) { return '<span class="badge bg-warning text-dark ms-1">' + u.name + '</span>'; }).join('') + '</div>'
         : '<div class="alert alert-success mb-3 py-2"><i class="fas fa-check-circle me-2"></i>All staff have submitted today\'s report!</div>';
 
+    var overdueStaff = {};
+    for (var oi = 0; oi < rpts.length; oi++) {
+        var or_ = rpts[oi]; if (or_.date >= t) continue;
+        for (var oj = 0; oj < or_.tasks.length; oj++) {
+            if (or_.tasks[oj].status !== 'completed') {
+                if (!overdueStaff[or_.userId]) overdueStaff[or_.userId] = {name: or_.userName, count: 0};
+                overdueStaff[or_.userId].count++;
+            }
+        }
+    }
+    var overdueKeys = Object.keys(overdueStaff);
+    var overdueHtml = overdueKeys.length > 0
+        ? '<div class="alert alert-danger mb-3 py-2"><i class="fas fa-exclamation-circle me-2"></i><strong>Overdue incomplete tasks — ' + overdueKeys.length + ' staff member(s):</strong>' +
+          overdueKeys.map(function(id) { return '<span class="badge bg-danger ms-1">'+overdueStaff[id].name+' ('+overdueStaff[id].count+' task'+(overdueStaff[id].count>1?'s':'')+')</span>'; }).join('') + '</div>'
+        : '';
+
     var recentRows = recent.map(function(r) {
         var dc=0,wc=0,nc=0;
         for (var j=0;j<r.tasks.length;j++) {
@@ -692,7 +709,7 @@ function buildAdminDash(rpts, users) {
     }).join('') || '<p class="text-muted text-center py-2">No staff yet</p>';
 
     var total = allTasks.length;
-    return '<div class="section-title"><i class="fas fa-tachometer-alt"></i>Dashboard</div>' + alertHtml +
+    return '<div class="section-title"><i class="fas fa-tachometer-alt"></i>Dashboard</div>' + alertHtml + overdueHtml +
         '<div class="row g-3 mb-4">' +
         '<div class="col-6 col-lg-3"><div class="stat-card blue"><div class="stat-value">'+rpts.length+'</div><div class="stat-label"><i class="fas fa-file-alt me-1"></i>Total Reports</div></div></div>' +
         '<div class="col-6 col-lg-3"><div class="stat-card green"><div class="stat-value">'+todayR.length+'/'+staff.length+'</div><div class="stat-label"><i class="fas fa-calendar-check me-1"></i>Today\'s Reports</div></div></div>' +
@@ -741,14 +758,16 @@ function buildAdminReports(rpts, users, f) {
         ? '<div class="empty-state data-table"><i class="fas fa-search"></i><p>No reports match your filters.</p></div>'
         : filtered.map(function(r) {
             var lines = r.tasks.map(function(tk) {
+                var odBadge = isOverdue(r.date, tk.status) ? ' <span class="badge-overdue"><i class="fas fa-exclamation-triangle me-1"></i>Overdue</span>' : '';
                 return '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;">'+
-                    statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+
+                    statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+odBadge+
                     (tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+
                     (tk.timeSpent?'<small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</small>':'')+
                     '</div>';
             }).join('');
+            var assignedBadge = r.assignedBy ? ' <span class="badge bg-primary" style="font-size:.7rem;"><i class="fas fa-user-tie me-1"></i>Admin Assigned</span>' : '';
             return '<div class="report-card"><div class="rpt-header">' +
-                '<div><h6 class="mb-0"><i class="fas fa-user me-2 text-primary"></i>'+r.userName+' '+moodIcon(r.mood)+'</h6>' +
+                '<div><h6 class="mb-0"><i class="fas fa-user me-2 text-primary"></i>'+r.userName+' '+moodIcon(r.mood)+assignedBadge+'</h6>' +
                 '<small class="text-muted">'+(r.department||'')+' &bull; '+fmtDate(r.date)+'</small></div>' +
                 '<button class="btn btn-sm btn-outline-primary" onclick="openReportModal(\''+r.id+'\')"><i class="fas fa-eye me-1"></i>Detail</button>' +
                 '</div>'+lines+(r.notes?'<div class="mt-2 text-muted" style="font-size:.85rem;border-top:1px solid #eee;padding-top:.5rem;"><i class="fas fa-sticky-note me-1"></i>'+r.notes+'</div>':'')+
@@ -796,6 +815,7 @@ function buildCalendarShell() {
         '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#28a745;vertical-align:middle;margin-right:4px;"></span>Completed</span>' +
         '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#ffc107;vertical-align:middle;margin-right:4px;"></span>In Progress</span>' +
         '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#007bff;vertical-align:middle;margin-right:4px;"></span>Not Started</span>' +
+        '<span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#dc3545;vertical-align:middle;margin-right:4px;"></span>Overdue</span>' +
         '</div>' +
         '<div class="data-table p-3">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">' +
@@ -851,11 +871,19 @@ function makeCalCell(day, year, month, other, today, dateMap) {
     cell.className = 'cal-cell' + (other?' other-month':'') + (ds===today?' today':'') + (tasks.length?' clickable':'');
     var dn = document.createElement('div'); dn.className = 'cal-day-num'; dn.textContent = day;
     cell.appendChild(dn);
+    var hasOverdue = false;
     tasks.slice(0, 2).forEach(function(tk) {
-        var lbl = document.createElement('span'); lbl.className = 'cal-task-lbl ' + tk.status; lbl.textContent = tk.name; lbl.title = tk.name;
+        var over = isOverdue(ds, tk.status);
+        if (over) hasOverdue = true;
+        var lbl = document.createElement('span'); lbl.className = 'cal-task-lbl ' + (over ? 'overdue' : tk.status); lbl.textContent = tk.name; lbl.title = tk.name;
         cell.appendChild(lbl);
     });
+    for (var k = 2; k < tasks.length; k++) { if (isOverdue(ds, tasks[k].status)) hasOverdue = true; }
     if (tasks.length > 2) { var m = document.createElement('div'); m.style.cssText='font-size:.7rem;color:#888;'; m.textContent = '+' + (tasks.length-2) + ' more'; cell.appendChild(m); }
+    if (hasOverdue) {
+        cell.classList.add('has-overdue');
+        var od = document.createElement('div'); od.style.cssText='font-size:.65rem;color:#dc3545;font-weight:600;'; od.innerHTML='<i class="fas fa-exclamation-triangle me-1"></i>Overdue'; cell.appendChild(od);
+    }
     if (tasks.length) { (function(d,tl){ cell.addEventListener('click', function(){ openDayModal(d,tl); }); })(ds, tasks); }
     return cell;
 }
@@ -863,8 +891,9 @@ function makeCalCell(day, year, month, other, today, dateMap) {
 function openDayModal(ds, tasks) {
     document.getElementById('dayModalTitle').textContent = 'Tasks — ' + fmtDate(ds);
     document.getElementById('dayModalBody').innerHTML = tasks.map(function(t) {
+        var overdueHtml = isOverdue(ds, t.status) ? '<span class="badge-overdue ms-1"><i class="fas fa-exclamation-triangle me-1"></i>Overdue</span>' : '';
         return '<div class="task-detail-item">' +
-            '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;"><strong>'+t.name+'</strong>' +
+            '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem;"><strong>'+t.name+'</strong>'+overdueHtml+
             (t.userName?'<small class="text-muted">by '+t.userName+'</small>':'')+
             '<div>'+statusBadge(t.status)+' '+priBadge(t.priority)+'</div></div>'+
             (t.description?'<div class="text-muted mt-1" style="font-size:.9rem;">'+t.description+'</div>':'')+
@@ -1034,38 +1063,44 @@ document.getElementById('cp-save-btn').addEventListener('click', function() {
 var _taskSeq = 0;
 var CATS = ['Development','Design','Testing','Documentation','Meeting','Review','DevOps','Research','Bug Fix','Planning','Content','Support','Other'];
 
-function buildSubmitForm(rpts) {
-    var user = SESSION.get(), t = todayStr(), existing = null;
+function buildSubmitForm(rpts, selectedDate) {
+    var t = selectedDate || todayStr(), existing = null;
     for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === t) { existing = rpts[i]; break; } }
     _taskSeq = 0;
-    var taskRows = (existing && existing.tasks.length) ? existing.tasks.map(function(tk){ return buildTaskRow(tk); }).join('') : buildTaskRow(null);
+    var isAssigned = !!(existing && existing.assignedBy);
+    var taskRows = (existing && existing.tasks.length) ? existing.tasks.map(function(tk){ return buildTaskRow(tk, isAssigned); }).join('') : buildTaskRow(null, false);
     var moodOpts = [{v:'excellent',l:'Excellent'},{v:'good',l:'Good'},{v:'okay',l:'Okay'},{v:'challenging',l:'Challenging'},{v:'difficult',l:'Difficult'}]
         .map(function(m){ return '<option value="'+m.v+'"'+((existing?existing.mood===m.v:m.v==='good')?' selected':'')+'>'+moodIcon(m.v)+' '+m.l+'</option>'; }).join('');
-    var delBtn = existing ? '<button type="button" class="btn btn-outline-danger" id="del-rpt-btn" data-rid="'+existing.id+'"><i class="fas fa-trash me-1"></i>Delete</button>' : '';
-    return '<div class="section-title"><i class="fas fa-'+(existing?'edit':'plus-circle')+'"></i>'+(existing?"Edit Today's Report":"Submit Daily Report")+'</div>' +
-        (existing?'<div class="alert alert-info mb-3 py-2"><i class="fas fa-info-circle me-2"></i>You already submitted today. Update it below.</div>':'') +
+    var delBtn = (existing && !isAssigned) ? '<button type="button" class="btn btn-outline-danger" id="del-rpt-btn" data-rid="'+existing.id+'"><i class="fas fa-trash me-1"></i>Delete</button>' : '';
+    var infoBanner = isAssigned
+        ? '<div class="alert alert-primary mb-3 py-2"><i class="fas fa-user-tie me-2"></i><strong>Tasks assigned by admin</strong> ('+(existing.assignedByName||'Admin')+').\u2003Update the status and submit when done.</div>'
+        : (existing ? '<div class="alert alert-info mb-3 py-2"><i class="fas fa-info-circle me-2"></i>You already submitted for this date. Update it below.</div>' : '');
+    return '<div class="section-title"><i class="fas fa-'+(existing?'edit':'plus-circle')+'"></i>Submit / Edit Daily Report</div>' +
+        '<div id="rpt-info">'+infoBanner+'</div>' +
         '<div class="data-table p-4" style="max-width:820px;"><form id="rpt-form">' +
         '<div class="row g-3 mb-3">' +
-        '<div class="col-md-6"><label class="form-label">Date</label><input type="date" class="form-control" id="rpt-date" value="'+t+'" max="'+t+'"></div>' +
+        '<div class="col-md-6"><label class="form-label">Date <small class="text-muted">(past, today, or future)</small></label><input type="date" class="form-control" id="rpt-date" value="'+t+'"></div>' +
         '<div class="col-md-6"><label class="form-label">Overall Mood</label><select class="form-select" id="rpt-mood">'+moodOpts+'</select></div>' +
         '</div>' +
         '<div class="mb-3"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">' +
         '<label class="form-label mb-0">Tasks <span class="text-danger">*</span></label>' +
         '<button type="button" class="btn btn-sm btn-outline-primary" id="add-task-btn"><i class="fas fa-plus me-1"></i>Add Task</button></div>' +
         '<div id="tasks-wrap">'+taskRows+'</div></div>' +
-        '<div class="mb-4"><label class="form-label">Notes / Blockers</label><textarea class="form-control" id="rpt-notes" rows="3" placeholder="Any notes, blockers...">'+(existing?existing.notes:'')+'</textarea></div>' +
+        '<div class="mb-4"><label class="form-label">Notes / Blockers</label><textarea class="form-control" id="rpt-notes" rows="3" placeholder="Any notes, blockers...">'+(existing?existing.notes||'':'')+'</textarea></div>' +
         '<div id="rpt-err" class="alert alert-danger d-none py-2 mb-3"></div>' +
         '<div class="d-flex gap-2"><button type="submit" class="btn btn-primary" id="rpt-submit-btn" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-'+(existing?'save':'paper-plane')+' me-2"></i>'+(existing?'Update Report':'Submit Report')+'</button>'+delBtn+'</div>' +
         '</form></div>';
 }
 
-function buildTaskRow(task) {
+function buildTaskRow(task, assigned) {
     var id = _taskSeq++;
     var catOpts = '<option value="">Category</option>' + CATS.map(function(c){ return '<option value="'+c+'"'+(task&&task.category===c?' selected':'')+'>'+c+'</option>'; }).join('');
     var ss = function(v){ return (task?task.status===v:v==='not-started')?' selected':''; };
     var ps = function(v){ return (task?task.priority===v:v==='medium')?' selected':''; };
-    return '<div class="task-item" id="tr-'+id+'">' +
-        '<button type="button" class="rm-btn" data-tid="'+id+'"><i class="fas fa-times"></i></button>' +
+    var rmBtn = assigned ? '' : '<button type="button" class="rm-btn" data-tid="'+id+'"><i class="fas fa-times"></i></button>';
+    var assignBadge = assigned ? '<span class="badge bg-primary mb-1" style="font-size:.7rem;"><i class="fas fa-user-tie me-1"></i>Admin Assigned</span><br>' : '';
+    return '<div class="task-item'+(assigned?' assigned-task':'')+'" id="tr-'+id+'">' +
+        rmBtn + assignBadge +
         '<div class="row g-2">' +
         '<div class="col-md-6"><input type="text" class="form-control form-control-sm" placeholder="Task name *" data-f="name" value="'+(task?task.name||'':'')+'"></div>' +
         '<div class="col-md-3"><select class="form-select form-select-sm" data-f="status"><option value="not-started"'+ss('not-started')+'>Not Started</option><option value="in-progress"'+ss('in-progress')+'>In Progress</option><option value="completed"'+ss('completed')+'>Completed</option></select></div>' +
@@ -1081,12 +1116,35 @@ function bindSubmitForm(rpts) {
     var addBtn = document.getElementById('add-task-btn');
     var delBtn = document.getElementById('del-rpt-btn');
     var wrap = document.getElementById('tasks-wrap');
+    var dateInput = document.getElementById('rpt-date');
     if (form) form.addEventListener('submit', function(e) { e.preventDefault(); doSubmitReport(rpts); });
-    if (addBtn) addBtn.addEventListener('click', function() { wrap.insertAdjacentHTML('beforeend', buildTaskRow(null)); bindRmBtns(); });
+    if (addBtn) addBtn.addEventListener('click', function() { wrap.insertAdjacentHTML('beforeend', buildTaskRow(null, false)); bindRmBtns(); });
     if (delBtn) delBtn.addEventListener('click', function() {
         var rid = delBtn.getAttribute('data-rid');
         if (!confirm('Delete this report?')) return;
         FS.deleteReport(rid).then(function() { showToast('Report deleted.','info'); navigate('staff-submit'); });
+    });
+    if (dateInput) dateInput.addEventListener('change', function() {
+        var date = this.value;
+        var existing = null;
+        for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === date) { existing = rpts[i]; break; } }
+        var isAssigned = !!(existing && existing.assignedBy);
+        _taskSeq = 0;
+        wrap.innerHTML = (existing && existing.tasks.length)
+            ? existing.tasks.map(function(tk){ return buildTaskRow(tk, isAssigned); }).join('')
+            : buildTaskRow(null, false);
+        bindRmBtns();
+        document.getElementById('rpt-notes').value = existing ? existing.notes || '' : '';
+        var infoDiv = document.getElementById('rpt-info');
+        if (infoDiv) {
+            if (isAssigned) {
+                infoDiv.innerHTML = '<div class="alert alert-primary mb-3 py-2"><i class="fas fa-user-tie me-2"></i><strong>Tasks assigned by admin</strong> ('+(existing.assignedByName||'Admin')+').\u2003Update the status and submit when done.</div>';
+            } else if (existing) {
+                infoDiv.innerHTML = '<div class="alert alert-info mb-3 py-2"><i class="fas fa-info-circle me-2"></i>You already submitted for this date. Update it below.</div>';
+            } else {
+                infoDiv.innerHTML = '';
+            }
+        }
     });
     bindRmBtns();
 }
@@ -1141,11 +1199,13 @@ function buildHistory(rpts) {
     var cards = rpts.length === 0
         ? '<div class="empty-state data-table"><i class="fas fa-file-alt"></i><p>No reports yet.</p><button class="btn btn-primary" onclick="navigate(\'staff-submit\')" style="background:#1a6fc4;">Submit First Report</button></div>'
         : rpts.map(function(r) {
+            var assignedLabel = r.assignedBy ? ' <span class="badge bg-primary" style="font-size:.7rem;"><i class="fas fa-user-tie me-1"></i>Admin Assigned</span>' : '';
             var lines = r.tasks.map(function(tk){
-                return '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;">'+statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+(tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+(tk.timeSpent?'<small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</small>':'')+' </div>';
+                var odBadge = isOverdue(r.date, tk.status) ? ' <span class="badge-overdue"><i class="fas fa-exclamation-triangle me-1"></i>Overdue</span>' : '';
+                return '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap;">'+statusBadge(tk.status)+' '+priBadge(tk.priority)+' <span>'+tk.name+'</span>'+odBadge+(tk.category?'<span class="badge bg-secondary">'+tk.category+'</span>':'')+(tk.timeSpent?'<small class="text-muted ms-auto"><i class="fas fa-clock me-1"></i>'+tk.timeSpent+'h</small>':'')+' </div>';
             }).join('');
             return '<div class="report-card"><div class="rpt-header">' +
-                '<div><h6 class="mb-0">'+fmtDate(r.date)+' '+moodIcon(r.mood)+'</h6><small class="text-muted">Submitted '+new Date(r.submittedAt).toLocaleString()+'</small></div>' +
+                '<div><h6 class="mb-0">'+fmtDate(r.date)+' '+moodIcon(r.mood)+assignedLabel+'</h6><small class="text-muted">Submitted '+new Date(r.submittedAt).toLocaleString()+'</small></div>' +
                 '<button class="btn btn-sm btn-outline-primary" data-edit-date="'+r.date+'"><i class="fas fa-edit me-1"></i>Edit</button></div>'+
                 lines+(r.notes?'<div class="mt-2 text-muted" style="font-size:.85rem;border-top:1px solid #eee;padding-top:.5rem;"><i class="fas fa-sticky-note me-1"></i>'+r.notes+'</div>':'')+
                 '</div>';
@@ -1164,9 +1224,107 @@ document.getElementById('main').addEventListener('click', function(e) {
     if (btn) {
         var date = btn.getAttribute('data-edit-date');
         navigate('staff-submit');
-        setTimeout(function() { var el = document.getElementById('rpt-date'); if(el) el.value = date; }, 200);
+        setTimeout(function() {
+            var el = document.getElementById('rpt-date');
+            if (el) { el.value = date; el.dispatchEvent(new Event('change')); }
+        }, 300);
     }
 });
+
+// ═══════════════════════════════════════════════════════════════
+// ADMIN — ASSIGN TASKS
+// ═══════════════════════════════════════════════════════════════
+function buildAdminAssign(users) {
+    var staff = users.filter(function(u) { return u.role === 'staff'; });
+    if (!staff.length) {
+        return '<div class="section-title"><i class="fas fa-tasks"></i>Assign Tasks</div>' +
+            '<div class="empty-state data-table"><i class="fas fa-users"></i><p>No staff yet. Add staff first via Staff Management.</p></div>';
+    }
+    var tomorrow = toDateStr(new Date(Date.now() + 86400000));
+    var staffOpts = '<option value="">-- Select Staff Member --</option>' +
+        staff.map(function(u){ return '<option value="'+u.id+'" data-name="'+u.name+'">'+u.name+(u.department?' ('+u.department+')':'')+'</option>'; }).join('');
+    _taskSeq = 1000;
+    return '<div class="section-title"><i class="fas fa-tasks"></i>Assign Tasks to Staff</div>' +
+        '<div class="alert alert-info mb-3 py-2" style="font-size:.9rem;"><i class="fas fa-info-circle me-2"></i>Assigned tasks will appear in the staff member\'s report for the chosen date. They can update the status and submit.</div>' +
+        '<div class="data-table p-4" style="max-width:820px;">' +
+        '<div class="row g-3 mb-3">' +
+        '<div class="col-md-6"><label class="form-label">Staff Member <span class="text-danger">*</span></label><select class="form-select" id="assign-staff">'+staffOpts+'</select></div>' +
+        '<div class="col-md-6"><label class="form-label">Task Date <span class="text-danger">*</span></label><input type="date" class="form-control" id="assign-date" value="'+tomorrow+'"></div>' +
+        '</div>' +
+        '<div class="mb-3"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;">' +
+        '<label class="form-label mb-0">Tasks <span class="text-danger">*</span></label>' +
+        '<button type="button" class="btn btn-sm btn-outline-primary" id="assign-add-task-btn"><i class="fas fa-plus me-1"></i>Add Task</button></div>' +
+        '<div id="assign-tasks-wrap">'+buildTaskRow(null, false)+'</div></div>' +
+        '<div class="mb-3"><label class="form-label">Notes for Staff</label>' +
+        '<textarea class="form-control" id="assign-notes" rows="2" placeholder="Instructions or context for the assigned tasks..."></textarea></div>' +
+        '<div id="assign-err" class="alert alert-danger d-none py-2 mb-3"></div>' +
+        '<button class="btn btn-primary" id="assign-save-btn" style="background:#1a6fc4;border-color:#1a6fc4;"><i class="fas fa-paper-plane me-2"></i>Assign Tasks</button>' +
+        '</div>';
+}
+function bindAdminAssign(users) {
+    var addBtn  = document.getElementById('assign-add-task-btn');
+    var saveBtn = document.getElementById('assign-save-btn');
+    var wrap    = document.getElementById('assign-tasks-wrap');
+    if (addBtn)  addBtn.addEventListener('click', function() { wrap.insertAdjacentHTML('beforeend', buildTaskRow(null, false)); bindAssignRmBtns(); });
+    if (saveBtn) saveBtn.addEventListener('click', function() { doAssignTasks(users); });
+    bindAssignRmBtns();
+}
+function bindAssignRmBtns() {
+    var btns = document.querySelectorAll('#assign-tasks-wrap .rm-btn');
+    for (var i = 0; i < btns.length; i++) {
+        (function(btn) { btn.onclick = function() { var r = document.getElementById('tr-'+btn.getAttribute('data-tid')); if (r) r.remove(); }; })(btns[i]);
+    }
+}
+function doAssignTasks(users) {
+    var staffId = document.getElementById('assign-staff').value;
+    var date    = document.getElementById('assign-date').value;
+    var notes   = document.getElementById('assign-notes').value.trim();
+    var errEl   = document.getElementById('assign-err');
+    var btn     = document.getElementById('assign-save-btn');
+    if (!staffId) { errEl.textContent = 'Please select a staff member.'; errEl.classList.remove('d-none'); return; }
+    if (!date)    { errEl.textContent = 'Please select a date.'; errEl.classList.remove('d-none'); return; }
+    var rows = document.getElementById('assign-tasks-wrap').querySelectorAll('.task-item');
+    var tasks = [];
+    for (var i = 0; i < rows.length; i++) {
+        var name = rows[i].querySelector('[data-f="name"]').value.trim();
+        if (!name) continue;
+        tasks.push({ id: genId(), name: name,
+            description: rows[i].querySelector('[data-f="description"]').value.trim(),
+            status:      rows[i].querySelector('[data-f="status"]').value,
+            priority:    rows[i].querySelector('[data-f="priority"]').value,
+            category:    rows[i].querySelector('[data-f="category"]').value,
+            timeSpent:   parseFloat(rows[i].querySelector('[data-f="timeSpent"]').value) || null });
+    }
+    if (!tasks.length) { errEl.textContent = 'Add at least one task.'; errEl.classList.remove('d-none'); return; }
+    errEl.classList.add('d-none');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Assigning...';
+    var staffUser = null;
+    for (var i = 0; i < users.length; i++) { if (users[i].id === staffId) { staffUser = users[i]; break; } }
+    var admin = SESSION.get();
+    FS.getReportsByUser(staffId).then(function(rpts) {
+        var existing = null;
+        for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === date) { existing = rpts[i]; break; } }
+        var report;
+        if (existing) {
+            report = Object.assign({}, existing, {
+                tasks: existing.tasks.concat(tasks),
+                notes: notes || existing.notes || '',
+                assignedBy: admin.id, assignedByName: admin.name
+            });
+        } else {
+            report = { id: genId(), userId: staffId, userName: staffUser.name, department: staffUser.department || '',
+                date: date, submittedAt: isoNow(), tasks: tasks, notes: notes, mood: 'good',
+                assignedBy: admin.id, assignedByName: admin.name };
+        }
+        return FS.saveReport(report);
+    }).then(function() {
+        showToast('Tasks assigned to ' + staffUser.name + ' for ' + fmtDate(date) + '!');
+        navigate('admin-assign');
+    }).catch(function(e) {
+        errEl.textContent = 'Error: ' + e.message; errEl.classList.remove('d-none');
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Assign Tasks';
+    });
+}
 
 // ═══════════════════════════════════════════════════════════════
 // EXPORT CSV
