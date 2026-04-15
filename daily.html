@@ -136,7 +136,7 @@
         </button>
         <p class="text-muted text-center mt-3" style="font-size:.78rem;">
             Config is saved in your browser. You only do this once per device.<br>
-            First launch will create the default admin account: <strong>admin / admin123</strong>
+            Config is saved in your browser. You only do this once per device.
         </p>
     </div>
 </div>
@@ -457,7 +457,7 @@ function bootApp() {
             if (users[i].role === 'admin') { adminExists = true; break; }
         }
         if (!adminExists) {
-            return FS.saveUser({id: 'admin', name: 'Administrator', username: 'admin', password: 'admin123', role: 'admin', department: 'Management', createdAt: isoNow()});
+            return FS.saveUser({id: 'admin', name: 'Administrator', username: 'admin', password: 'BlueSpr!ng#2025', role: 'admin', department: 'Management', createdAt: isoNow()});
         }
     }).then(function() {
         // Check for saved session
