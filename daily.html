@@ -518,6 +518,7 @@ document.getElementById('logout-btn').addEventListener('click', function() {
 // APP LAUNCH & NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 function launchApp(user) {
+    window._currentUser = user;
     showPage('app-page');
     document.getElementById('nav-name').textContent = user.name;
     document.getElementById('nav-role').textContent = user.role === 'admin' ? 'Admin' : 'Staff';
@@ -601,16 +602,16 @@ function loadView(view) {
             bindSettings();
             return Promise.resolve();
         case 'staff-submit':
-            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+            return FS.getReportsByUser(window._currentUser.id).then(function(rpts) {
                 mc.innerHTML = buildSubmitForm(rpts);
                 bindSubmitForm(rpts);
             });
         case 'staff-history':
-            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+            return FS.getReportsByUser(window._currentUser.id).then(function(rpts) {
                 mc.innerHTML = buildHistory(rpts);
             });
         case 'staff-calendar':
-            return FS.getReportsByUser(SESSION.get().id).then(function(rpts) {
+            return FS.getReportsByUser(window._currentUser.id).then(function(rpts) {
                 CAL.staffOnly = true;
                 mc.innerHTML = buildCalendarShell();
                 drawCalCells(rpts);
@@ -978,7 +979,9 @@ document.getElementById('sf-save-btn').addEventListener('click', function() {
 // SETTINGS
 // ═══════════════════════════════════════════════════════════════
 function buildSettings() {
-    var admin = SESSION.get();
+    var admin = FS.auth.currentUser ? 
+    (function(){ var u = FS.auth.currentUser; return {id: u.uid, name: u.displayName || 'Administrator', department: ''}; })() 
+    : {};
     return '<div class="section-title"><i class="fas fa-cog"></i>Settings</div>' +
         '<div class="data-table p-4" style="max-width:600px;">' +
         '<h6 class="mb-3">Admin Account</h6>' +
@@ -998,10 +1001,10 @@ function bindSettings() {
         var name = document.getElementById('set-name').value.trim();
         var dept = document.getElementById('set-dept').value.trim();
         if (!name) { showToast('Name required.', 'error'); return; }
-        var user = SESSION.get();
+        var admin = window._currentUser || {};
         FS.saveUser(Object.assign({}, user, {name:name, department:dept})).then(function() {
             var updated = Object.assign({}, user, {name:name, department:dept});
-            SESSION.set(updated);
+            window._currentUser = updated;
             document.getElementById('nav-name').textContent = name;
             showToast('Settings saved!');
         });
@@ -1157,7 +1160,7 @@ function collectTasks() {
     return tasks;
 }
 function doSubmitReport(rpts) {
-    var user  = SESSION.get();
+    var user  = window._currentUser;
     var date  = document.getElementById('rpt-date').value;
     var mood  = document.getElementById('rpt-mood').value;
     var notes = document.getElementById('rpt-notes').value.trim();
@@ -1287,7 +1290,9 @@ function doAssignTasks(users) {
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Assigning...';
     var staffUser = null;
     for (var i = 0; i < users.length; i++) { if (users[i].id === staffId) { staffUser = users[i]; break; } }
-    var admin = SESSION.get();
+    var admin = FS.auth.currentUser ? 
+    (function(){ var u = FS.auth.currentUser; return {id: u.uid, name: u.displayName || 'Administrator', department: ''}; })() 
+    : {};
     FS.getReportsByUser(staffId).then(function(rpts) {
         var existing = null;
         for (var i = 0; i < rpts.length; i++) { if (rpts[i].date === date) { existing = rpts[i]; break; } }
